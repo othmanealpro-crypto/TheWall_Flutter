@@ -1,177 +1,81 @@
-# 🧱 The Wall (Supabase Version)
+# TheWall_Flutter
 
-A simple social wall Flutter app where users can register, log in, and post public messages in real time using **Supabase Authentication** and **Supabase Database**.
+TheWall est une application sociale mobile developpee avec Flutter et Supabase. Elle permet aux utilisateurs de creer un compte, gerer leur profil, publier des messages et consulter un fil d'actualite en temps reel.
 
----
+Cette version correspond a la branche `Othmane`.
 
-## 🚀 Features
+## Fonctionnalites
 
-- 🔐 **User Authentication** with Supabase (Email & Password)
-- 🧱 **Public Wall** where users post messages visible to everyone
-- ⚡ **Realtime Updates** using Supabase Realtime / Streams
-- 📱 **Modern Flutter UI**
-- 🔁 **Session Persistence** thanks to Supabase Auth
+- Inscription et connexion utilisateur
+- Persistance de session
+- Profils utilisateurs
+- Publication et consultation de messages publics
+- Fil d'actualite en temps reel
+- Ajout d'amis et gestion des demandes
+- Messagerie entre utilisateurs
+- Modification de la photo de profil
+- Stockage des images avec Supabase Storage
 
----
+## Technologies
 
-## 🧩 Tech Stack
+- Flutter et Dart
+- Supabase Auth
+- Supabase Database / PostgreSQL
+- Supabase Realtime
+- Supabase Storage
+- Firebase Core, Firebase Auth et Cloud Firestore
+- `image_picker` pour la selection d'images
 
-- **Frontend:** Flutter (Dart)
-- **Backend:** Supabase  
-  - Supabase Auth  
-  - Supabase Postgres (Database)  
-  - Supabase Realtime (optional)  
-- **Architecture:** Stateful Widgets & Components
+## Prerequis
 
----
+- Flutter SDK compatible avec Dart 3.9+
+- Android Studio ou Xcode selon la plateforme cible
+- Un projet Supabase configure
+- Les variables et identifiants necessaires dans la configuration de l'application
 
-## 📂 Folder Structure
-
-```
-lib/
- ├── main.dart                       # Supabase initialization + App root
- │
- ├── auth/
- │    ├── auth.dart                  # Listens to Supabase auth state
- │    ├── login_or_register.dart     # Switch login/register
- │    ├── login_page.dart            # Login with Supabase
- │    └── register_page.dart         # Sign up + insert into profiles table
- │
- ├── components/
- │    ├── button.dart
- │    ├── text_field.dart
- │    └── wall_post.dart             # Message UI component
- │
- └── pages/
-      └── home_page.dart             # Displays messages from Supabase
-```
-
----
-
-## ⚙️ Setup & Installation
-
-### 1️⃣ Prerequisites
-
-- Flutter SDK  
-- A configured **Supabase project**
-- Add Supabase package:
+## Installation
 
 ```bash
-flutter pub add supabase_flutter
-```
-
----
-
-### 2️⃣ Clone this repository
-
-```bash
-git clone https://github.com/ZedKaS/TheWall_Flutter.git
+git clone --branch Othmane https://github.com/othmanealpro-crypto/TheWall_Flutter.git
 cd TheWall_Flutter
+flutter pub get
 ```
 
----
+Configurer ensuite les acces Supabase dans le projet avant de lancer l'application.
 
-### 3️⃣ Initialize Supabase in `main.dart`
+## Lancement
 
-```dart
-await Supabase.initialize(
-  url: 'https://YOUR-PROJECT.supabase.co',
-  anonKey: 'YOUR-ANON-KEY',
-);
+```bash
+flutter run
 ```
 
----
+Pour verifier le code et les tests :
 
-## 🗄️ Supabase Database Setup
-
-### Create `profiles` table
-
-```sql
-create table profiles (
-  id uuid primary key,
-  email text not null,
-  nom text,
-  prenom text,
-  username text unique,
-  created timestamp default now()
-);
+```bash
+flutter analyze
+flutter test
 ```
 
-### Create `posts` table
+## Structure
 
-```sql
-create table posts (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references profiles(id),
-  content text not null,
-  created_at timestamp default now()
-);
+```text
+lib/
+├── auth/
+├── components/
+├── pages/
+├── assets/
+├── main.dart
+└── session_manager.dart
 ```
 
-Enable RLS + add proper policies in Supabase.
+## Branche
 
----
+Le travail publie ici est disponible sur la branche `Othmane` :
 
-## 🧠 How Authentication Works
-
-### 🔑 `auth.dart`
-Listens to:
-
-```dart
-Supabase.instance.client.auth.onAuthStateChange
+```bash
+git checkout Othmane
 ```
 
-If user is logged in → **HomePage**  
-Else → **LoginOrRegister**
+## Auteur
 
----
-
-### 🔐 `login_page.dart`
-
-Handles login:
-
-```dart
-supabase.auth.signInWithPassword(
-  email: ...,
-  password: ...,
-);
-```
-
-Shows dialog messages on success/error.
-
----
-
-### 📝 `register_page.dart`
-
-1. Creates user in Supabase Auth  
-2. Inserts profile into table `profiles`
-
-```dart
-supabase.from('profiles').insert({...});
-```
-
----
-
-## 📸 Screens Overview
-
-| Screen | Description |
-|--------|--------------|
-| 🔐 Login / Register | Supabase Auth |
-| 🧱 HomePage | Displays posts |
-| 🚪 Logout | Ends session |
-
----
-
-## 🌟 Future Improvements
-
-- Add profile pictures (Supabase Storage)  
-- Likes & comments system  
-- Realtime notifications  
-- Dark Mode  
-- Better timestamp formatting  
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License — feel free to modify and share.
+Othmane Al Amrani - [GitHub](https://github.com/othmanealpro-crypto)
