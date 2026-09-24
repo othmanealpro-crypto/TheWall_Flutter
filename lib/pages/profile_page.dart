@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../session_manager.dart';
 import 'messages_page.dart';
 import 'add_friends_page.dart';
@@ -16,6 +20,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final supabase = Supabase.instance.client;
   final sessionManager = SessionManager();
+  final ImagePicker _picker = ImagePicker();
 
   Map<String, dynamic>? userProfile;
   List<Map<String, dynamic>> userPublications = [];
@@ -40,10 +45,11 @@ class _ProfilePageState extends State<ProfilePage> {
         .stream(primaryKey: ['id'])
         .eq('id', currentUserId)
         .listen((profiles) {
-          setState(() {
-            userProfile = profiles.first;
-          });
-        });
+      if (!mounted || profiles.isEmpty) return;
+      setState(() {
+        userProfile = profiles.first;
+      });
+    });
 
     _pubSub = supabase
         .from('publications')
@@ -51,18 +57,19 @@ class _ProfilePageState extends State<ProfilePage> {
         .eq('profile_id', currentUserId)
         .order('created_at', ascending: false)
         .listen((pubs) async {
-          for (var p in pubs) {
-            final owner = await supabase
-                .from('profiles')
-                .select()
-                .eq('id', p['profile_id'])
-                .single();
-            p['owner'] = owner;
-          }
-          setState(() {
-            userPublications = pubs;
-          });
-        });
+      for (var p in pubs) {
+        final owner = await supabase
+            .from('profiles')
+            .select()
+            .eq('id', p['profile_id'])
+            .single();
+        p['owner'] = owner;
+      }
+      if (!mounted) return;
+      setState(() {
+        userPublications = pubs;
+      });
+    });
 
     _fetchFriendsCount();
   }
@@ -73,6 +80,7 @@ class _ProfilePageState extends State<ProfilePage> {
         .select()
         .eq('user_id', currentUserId);
 
+    if (!mounted) return;
     setState(() {
       friendsCount = data.length;
     });
@@ -98,6 +106,47 @@ class _ProfilePageState extends State<ProfilePage> {
     if (diff.inHours < 24) return "${diff.inHours} h";
     return "${diff.inDays} j";
   }
+
+  // =======================
+  // 🔥 CHANGEMENT AVATAR
+  // =======================
+  Future<void> _changeProfilePicture() async {
+    final XFile? picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    final fileName =
+        "$currentUserId-${DateTime.now().millisecondsSinceEpoch}.jpg";
+
+    if (kIsWeb) {
+      // ✅ Web: lire les octets
+      final Uint8List bytes = await picked.readAsBytes();
+      await supabase.storage.from('profile-pictures').uploadBinary(
+        fileName,
+        bytes,
+        fileOptions: const FileOptions(upsert: true),
+      );
+    } else {
+      // ✅ Mobile/Desktop: File
+      final file = File(picked.path);
+      await supabase.storage.from('profile-pictures').upload(
+        fileName,
+        file,
+        fileOptions: const FileOptions(upsert: true),
+      );
+    }
+
+    // Mise à jour du profil
+    await supabase
+        .from('profiles')
+        .update({'avatar_url': fileName})
+        .eq('id', currentUserId);
+
+    // Le stream supabase mettra à jour automatiquement l'UI
+  }
+
 
   void _onNavTap(int index) {
     if (index == 0) {
@@ -132,8 +181,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final avatarUrl = userProfile!['avatar_url'] != null
         ? supabase.storage
-              .from('profile-pictures')
-              .getPublicUrl(userProfile!['avatar_url'])
+        .from('profile-pictures')
+        .getPublicUrl(userProfile!['avatar_url'])
         : null;
 
     return Scaffold(
@@ -160,42 +209,37 @@ class _ProfilePageState extends State<ProfilePage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(width: 22), // Décalage de 2 espaces pour l'image
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.grey[300],
-                  backgroundImage: avatarUrl != null
-                      ? NetworkImage(avatarUrl)
-                      : null,
-                  child: avatarUrl == null
-                      ? const Icon(Icons.person, size: 50, color: Colors.white)
-                      : null,
+                const SizedBox(width: 22),
+                GestureDetector(
+                  onTap: _changeProfilePicture,
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage:
+                    avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                    child: avatarUrl == null
+                        ? const Icon(Icons.person,
+                        size: 50, color: Colors.white)
+                        : null,
+                  ),
                 ),
-                const SizedBox(
-                  width: 32,
-                ), // Décalage de 4 espaces pour le compteur
+                const SizedBox(width: 32),
                 Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text(
                       "Amis",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style:
+                      TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       "$friendsCount",
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style:
+                      const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ],
             ),
-
             const SizedBox(height: 15),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -222,104 +266,13 @@ class _ProfilePageState extends State<ProfilePage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "Prénom : ${userProfile!['prenom'] ?? ''}",
-                  style: const TextStyle(fontSize: 18),
-                ),
-                Text(
-                  "Nom : ${userProfile!['nom'] ?? ''}",
-                  style: const TextStyle(fontSize: 18),
-                ),
-                Text(
-                  "Email : ${userProfile!['email'] ?? ''}",
-                  style: const TextStyle(fontSize: 18),
-                ),
-                Text(
-                  "Date de création : ${userProfile!['created'] != null ? DateTime.parse(userProfile!['created']).toLocal().toString().split('.')[0] : ''}",
-                  style: const TextStyle(fontSize: 18),
-                ),
+                Text("Prénom : ${userProfile!['prenom'] ?? ''}",
+                    style: const TextStyle(fontSize: 18)),
+                Text("Nom : ${userProfile!['nom'] ?? ''}",
+                    style: const TextStyle(fontSize: 18)),
+                Text("Email : ${userProfile!['email'] ?? ''}",
+                    style: const TextStyle(fontSize: 18)),
               ],
-            ),
-            const SizedBox(height: 30),
-            const Text(
-              "Mes publications",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            if (userPublications.isEmpty)
-              const Text("Aucune publication pour le moment."),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: userPublications.length,
-              itemBuilder: (context, index) {
-                final pub = userPublications[index];
-                final owner = pub['owner'];
-                final bool ownerOnline = owner['online'] ?? false;
-                final bool isMyPost = pub['profile_id'] == currentUserId;
-                final bool green = isMyPost || ownerOnline;
-
-                return Card(
-                  color: Colors.white,
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(15),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: green ? Colors.green : Colors.red,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              "@${owner['username']}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              relativeTime(DateTime.parse(pub['created_at'])),
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(pub['content'] ?? ''),
-                        if (pub['image'] != null) ...[
-                          const SizedBox(height: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(pub['image']),
-                          ),
-                        ],
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.favorite_border,
-                              color: Colors.black,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              "${pub['likes'] ?? 0}",
-                              style: const TextStyle(color: Colors.black),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
             ),
           ],
         ),
